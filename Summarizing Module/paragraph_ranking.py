@@ -1,4 +1,7 @@
 from typing import List, Dict
+import manager as mgr
+from numpy import log, sin, pi
+from nltk.tokenize import sent_tokenize, word_tokenize
 from text_utils import simple_pre_process, rigorous_pre_process, tf_idf
 
 def extract_top_k_paragraphs(text_doc: str, k: int = 5) -> (Dict[str, str], List[str]):
@@ -15,13 +18,39 @@ def extract_top_k_paragraphs(text_doc: str, k: int = 5) -> (Dict[str, str], List
     ranked_paragraphs = _rank_and_order_paragraphs(rigorously_processed_doc, tf_idf_values)
 
     num_returns = min(k, len(ranked_paragraphs))
-    return ranked_paragraphs[:num_returns]
+    return sentence_mapper, ranked_paragraphs[:num_returns]
 
-def _rank_and_order_paragraphs(processed_doc, tf_idf_values) -> List[str]:
+def _rank_and_order_paragraphs(processed_doc: str, tf_idf_values: Dict[str, float]) -> List[str]:
     '''
     This method is used to rank a paragraph based on normalized tf-idf and length scores.
-    0.9 is chosen as the importance of normalized tf-idf and 0.1 is chosen as the 
+    β_0(0.9) is chosen as the importance of normalized tf-idf and β_1(0.1) is chosen as the 
     importance of length.
     It returns all the paragraphs in ascending order of their rank.
     '''
-    return []
+    paragraph_score = {} # idx: score type dictionary. idx specifies the index of paragraph in the document.
+    paragraphs = processed_doc.split(mgr.paragraph_separator)
+
+    for idx, paragraph in enumerate(paragraphs):
+        score = _find_paragraph_score(paragraph, tf_idf_values)
+        paragraph_score[idx] = score
+
+    ranked_paragraphs = [paragraphs[idx] for idx, _ in sorted(paragraph_score.items(), key=lambda item: item[1], reverse=True)]
+    return ranked_paragraphs
+
+def _find_paragraph_score(paragraph: str, tf_idf_values: Dict[str, float]) -> float:
+    paragraph_length = 0
+    tf_idf_score = 0
+    beta_0 = 0.9
+    beta_1 = 0.1
+
+    for sentence in sent_tokenize(paragraph):
+        word_tokens = word_tokenize(sentence)
+        paragraph_length += len(word_tokens)
+        for token in word_tokens:
+            tf_idf_score += tf_idf_values[token]
+
+    tf_idf_score = tf_idf_score / log(paragraph_length)
+    # length_score = sin() # How to decide on a proper score?
+
+    # return beta_0 * tf_idf_score + beta_1 * length_score
+        

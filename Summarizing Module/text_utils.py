@@ -142,7 +142,7 @@ def _map_sentences(processed_doc: str, unprocessed_sents: List[str]) -> Dict[str
         if read_count == len(unprocessed_sents): break
     return mapper
 
-def tf_idf(text_doc: str) -> Dict[str, int]:
+def tf_idf(text_doc: str) -> Dict[str, float]:
     '''
     This method is used to find out the tf_idf scores for each word in a document. Given a rigorously pre-processed
     document, this outputs a dictionary of words along with their tf-idf scores
@@ -167,6 +167,13 @@ def tf_idf(text_doc: str) -> Dict[str, int]:
             if token in paragraph: count += 1
         idf_matrix[token] = np.log((len(paragraphs) / count) + 1)
     
+    '''
+    An extra term '1' is added because it is highly possible that a lot of words would be present in all of the
+    paragraphs (mind that paragraph is used as document for inverse document frequency). 
+    In such a case, irrespective of term frequency, a lot of words would have a zero score of tf-idf,
+    which might me misleading, hence 1 is added in order to avoid a sparse tf-idf score vector for words.
+    '''
+
     tf_idf_dict = {}
     for token in tf_matrix.keys():
         tf_idf_dict[token] = tf_matrix[token] * idf_matrix[token]
