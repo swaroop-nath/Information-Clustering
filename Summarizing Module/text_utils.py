@@ -147,7 +147,30 @@ def tf_idf(text_doc: str) -> Dict[str, int]:
     This method is used to find out the tf_idf scores for each word in a document. Given a rigorously pre-processed
     document, this outputs a dictionary of words along with their tf-idf scores
     '''
-    pass
+    paragraphs = text_doc.split(mgr.paragraph_separator)
+    tf_matrix = {}
+    idf_matrix = {}
+
+    for paragraph in paragraphs:
+        for sentence in sent_tokenize(paragraph):
+            for token in word_tokenize(sentence):
+                if tf_matrix.get(token) is None: tf_matrix[token] = 1
+                else: tf_matrix[token] += 1
+
+    total_token_count = sum(list(tf_matrix.values))
+    for token in tf_matrix.keys():
+        tf_matrix[token] /= total_token_count
+
+    for token in tf_matrix.keys():
+        count = 0
+        for paragraph in paragraphs:
+            if token in paragraph: count += 1
+        idf_matrix[token] = np.log((len(paragraphs) / count) + 1)
+    
+    tf_idf_dict = {}
+    for token in tf_matrix.keys():
+        tf_idf_dict[token] = tf_matrix[token] * idf_matrix[token]
+    return tf_idf_dict
 
 def vectorize_sentence(sentence: str) -> np.ndarray:
     '''
