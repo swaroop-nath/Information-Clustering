@@ -1,5 +1,11 @@
 */temp_files
 learning_items
-*/data/*
+Summarizing\ Module/data
 */discussion.txt
 */literature
+Summarizing\ Module/tests.py
+Summarizing\ Module/pre-trained\ models
+.DS_Store
+Summarizing\ Module/.DS_Store
+Summarizing Module/__pycache__/text_utils.cpython-37.pyc
+Summarizing Module/__pycache__/manager.cpython-37.pyc
