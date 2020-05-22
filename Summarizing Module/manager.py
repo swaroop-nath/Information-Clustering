@@ -16,7 +16,7 @@ with open('abbreviations.mapper', 'r') as file:
 paragraph_separator = '\n\n'
 sentence_separator = ' '
 token_separator = ' '
-unnecessary_identifier_regex = '[0-9\[\]%/,()–\'<>^~`@|#$+:;]'
+unnecessary_identifier_regex = '[0-9\[\]%/,()–\'<>^~`@|#$+:;']'
 expander = Contractions(api_key = 'glove-wiki-gigaword-50')
 
 spacy_tool = spacy.load('en')

@@ -105,5 +105,8 @@
 'viz' : 'namely',
 'viz.' : 'namely',
 '%' : 'percentage',
-'am': 'am'
+'am': 'am',
+'L.L.B.': 'Bachelor of Legislative Law',
+'LLB': 'Bachelor of Legislative Law',
+'LLB.': 'Bachelor of Legislative Law'
 }
