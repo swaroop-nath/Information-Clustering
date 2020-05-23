@@ -5,6 +5,7 @@ from typing import Dict, List
 from normalise import normalise
 import manager as mgr
 from nltk.tokenize import sent_tokenize, word_tokenize
+from abbreviations import schwartz_hearst
 
 def simple_pre_process(text_doc: str) -> str:
     '''
@@ -33,7 +34,7 @@ def simple_pre_process(text_doc: str) -> str:
 
     return final_doc
 
-def rigorous_pre_process(text_doc: str) -> (Dict[str, str], str):
+def rigorous_pre_process(text_doc: str, abbrevs: Dict[str, str]) -> (Dict[str, str], str):
     '''
     This is meant to be an extensive pre-processing procedure. It does assume that simple preprocessing has been done on the
     text. It further extends the pre-processing to lower-casing the text, removal of apostrophes'/expansion of abbreviations,
@@ -43,8 +44,11 @@ def rigorous_pre_process(text_doc: str) -> (Dict[str, str], str):
     processed text document. This will be used for grouping paragraphs in the subsequent step.
     '''
     
+    # Resolving coreference
+    resolved_doc = _resolve_pronouns(text_doc)
+
     # Expanding contractions, like aren't to are not. And storing the unprocessed sentences.
-    paragraphs = text_doc.split(mgr.paragraph_separator)
+    paragraphs = resolved_doc.split(mgr.paragraph_separator)
     unprocessed_sents = []
     expanded_paragraphs = []
     
@@ -55,12 +59,19 @@ def rigorous_pre_process(text_doc: str) -> (Dict[str, str], str):
         expanded_paragraphs.append(expanded_paragraph)
     del paragraphs
 
-    # Treating abbreviations, like U.S.A --> United States of America.
-    normalised_paragraphs = []
+    # Removing unwanted abbreviations, those inside braces
+    cleaned_paragraphs = []
     for paragraph in expanded_paragraphs:
-        normalised_paragraph = _normalize_paragraph(paragraph)
-        normalised_paragraphs.append(normalised_paragraph)
+        cleaned_paragraph = _remove_unwanted_abbrev(paragraph, abbrevs)
+        cleaned_paragraphs.append(cleaned_paragraph)
     del expanded_paragraphs
+
+    # Treating abbreviations, like U.S.A --> United States of America, and also context based abbreviations
+    normalised_paragraphs = []
+    for paragraph in cleaned_paragraphs:
+        normalised_paragraph = _normalize_paragraph(paragraph, abbrevs)
+        normalised_paragraphs.append(normalised_paragraph)
+    del cleaned_paragraphs
 
     # Removing unwanted symbols.
     cleaned_paragraphs = []
@@ -84,10 +95,26 @@ def rigorous_pre_process(text_doc: str) -> (Dict[str, str], str):
     processed_text = mgr.paragraph_separator.join(lemmatized_paragraphs)
     del stop_word_free_paragraphs, lemmatized_paragraphs
 
+    # Doing post cleaning, removing double - spaces, spaces before period etc.
+    processed_text = _do_post_processing(processed_text)
+
     # Mapping to unprocessed sentences.
     sentence_mapper = _map_sentences(processed_text, unprocessed_sents)
     
     return (sentence_mapper, processed_text)
+
+def _resolve_pronouns(text_doc: str) -> str:
+    spacy_doc = mgr.spacy_tool(text_doc)
+    resolved_doc = spacy_doc._.coref_resolved
+    
+    return resolved_doc
+
+def _remove_unwanted_abbrev(paragraph: str, abbrevs: Dict[str, str]) -> str:
+    for abbrev in abbrevs.keys():
+        candidate = mgr.prefix + abbrev + mgr.suffix
+        paragraph = re.sub(candidate, '', paragraph)
+    
+    return paragraph
 
 def _expand_textual_contractions(paragraph: str) -> str:
     expanded_sentences = []
@@ -98,10 +125,12 @@ def _expand_textual_contractions(paragraph: str) -> str:
     processed_paragraph = mgr.sentence_separator.join(expanded_sentences)
     return processed_paragraph
 
-def _normalize_paragraph(paragraph: str) -> str:
+def _normalize_paragraph(paragraph: str, user_abbrevs: str) -> str:
     normalised_sentences = []
+    user_abbrevs.update(mgr.abbreviations_map)
+
     for sentence in sent_tokenize(paragraph):
-        normalised_sentence = mgr.token_separator.join(normalise(word_tokenize(sentence), verbose=False, user_abbrevs=mgr.abbreviations_map))
+        normalised_sentence = mgr.token_separator.join(normalise(word_tokenize(sentence), verbose=False, user_abbrevs=user_abbrevs))
         normalised_sentences.append(normalised_sentence)
 
     processed_paragraph = mgr.sentence_separator.join(normalised_sentences)
@@ -128,6 +157,13 @@ def _lemmatize_paragraph(paragraph: str) -> str:
 
     processed_paragraph = mgr.sentence_separator.join(processed_sentences)
     return processed_paragraph
+
+def _do_post_processing(text_doc: str) -> str:
+    doc = re.sub(mgr.unnecessary_space, ' ', text_doc)
+    doc = re.sub(mgr.unnecessary_space_period, '.', doc)
+    doc = re.sub(mgr.unnecessary_unresolved_pron, '', doc)
+    doc = re.sub(mgr.unnecessary_apostrophe, '', doc)
+    return doc
 
 def _map_sentences(processed_doc: str, unprocessed_sents: List[str]) -> Dict[str, str]:
     read_count = 0
@@ -178,6 +214,18 @@ def tf_idf(text_doc: str) -> Dict[str, float]:
     for token in tf_matrix.keys():
         tf_idf_dict[token] = tf_matrix[token] * idf_matrix[token]
     return tf_idf_dict
+
+def find_abbreviations(text_docs: List[str]) ->Dict[str, str]:
+    '''
+    This method is used to find the list of abbreviations in the document.
+    It returns a dictionary of type - abbr. : full_form
+    '''
+    pairs = {}
+    for doc in text_docs:
+        found = schwartz_hearst.extract_abbreviation_definition_pairs(doc_text=doc, most_common_definition=True)
+        pairs.update(found)
+    return pairs
+    pass
 
 def vectorize_sentence(sentence: str) -> np.ndarray:
     '''

@@ -4,7 +4,7 @@ from numpy import log, sqrt
 from nltk.tokenize import sent_tokenize, word_tokenize
 from text_utils import simple_pre_process, rigorous_pre_process, tf_idf
 
-def extract_top_k_paragraphs(text_doc: str, k: int = 5) -> (Dict[str, str], str):
+def extract_top_k_paragraphs(text_doc: str, abbrevs, k: int = 5) -> (Dict[str, str], str):
     '''
     This method is used to extract the top k paragraphs in the document. It returns a tuple
     of a sentence mapper and the list of top k paragraphs.
@@ -12,7 +12,7 @@ def extract_top_k_paragraphs(text_doc: str, k: int = 5) -> (Dict[str, str], str)
     document, so that a coherent and human readable output can be produced
     '''
     simple_processed_doc = simple_pre_process(text_doc=text_doc)
-    sentence_mapper, rigorously_processed_doc = rigorous_pre_process(text_doc=simple_processed_doc)
+    sentence_mapper, rigorously_processed_doc = rigorous_pre_process(text_doc=simple_processed_doc, abbrevs=abbrevs)
     tf_idf_values = tf_idf(text_doc=rigorously_processed_doc)
 
     ranked_paragraphs = _rank_and_order_paragraphs(rigorously_processed_doc, tf_idf_values)

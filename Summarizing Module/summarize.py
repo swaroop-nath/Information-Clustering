@@ -1,5 +1,6 @@
 from typing import List, Dict
 from paragraph_ranking import extract_top_k_paragraphs
+from text_utils import find_abbreviations
 import manager as mgr
 from nltk import sent_tokenize
 
@@ -10,8 +11,11 @@ def summarize_docs(docs: List[str]) -> str:
     '''
     sentence_mapper = None
     important_paragraphs = []
+
+    abbrevs = find_abbreviations(docs)
+
     for doc in docs:
-        mapper, top_k = extract_top_k_paragraphs(doc)
+        mapper, top_k = extract_top_k_paragraphs(doc, abbrevs)
         if sentence_mapper is None: sentence_mapper = mapper
         else: sentence_mapper.update(mapper)
         important_paragraphs.append(top_k)

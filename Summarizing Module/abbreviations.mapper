@@ -108,5 +108,13 @@
 'am': 'am',
 'L.L.B.': 'Bachelor of Legislative Law',
 'LLB': 'Bachelor of Legislative Law',
-'LLB.': 'Bachelor of Legislative Law'
+'LLB.': 'Bachelor of Legislative Law',
+'HIV': 'Human Immunodeficiency Virus',
+'H.I.V.': 'Human Immunodeficiency Virus',
+'HIV.': 'Human Immunodeficiency Virus',
+'H.I.V': 'Human Immunodeficiency Virus',
+'AIDS': 'Acquired Immunodeficiency Syndrome',
+'A.I.D.S.': 'Acquired Immunodeficiency Syndrome',
+'AIDS.': 'Acquired Immunodeficiency Syndrome',
+'A.I.D.S': 'Acquired Immunodeficiency Syndrome',
 }
