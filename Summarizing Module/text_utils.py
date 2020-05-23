@@ -193,7 +193,7 @@ def tf_idf(text_doc: str) -> Dict[str, float]:
                 if tf_matrix.get(token) is None: tf_matrix[token] = 1
                 else: tf_matrix[token] += 1
 
-    total_token_count = sum(list(tf_matrix.values))
+    total_token_count = sum(list(tf_matrix.values()))
     for token in tf_matrix.keys():
         tf_matrix[token] /= total_token_count
 
