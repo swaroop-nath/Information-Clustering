@@ -6,6 +6,7 @@ from normalise import normalise
 import manager as mgr
 from nltk.tokenize import sent_tokenize, word_tokenize
 from abbreviations import schwartz_hearst
+from utils import load_sentence_vectorizer
 
 def simple_pre_process(text_doc: str) -> str:
     '''
@@ -232,7 +233,8 @@ def vectorize_sentence(sentence: str) -> np.ndarray:
     This method is responsible for mapping a given sentence to an embedding space. It outputs a numpy array that is the
     vector representation of the sentence.
     '''
-    pass
+    vectorizer = load_sentence_vectorizer()
+    return vectorizer([sentence]).numpy()
 
 def produce_chunk_graph(cluster: List[str]):
     pass
