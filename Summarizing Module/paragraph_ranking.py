@@ -41,6 +41,7 @@ def _find_paragraph_score(paragraph: str, tf_idf_values: Dict[str, float]) -> fl
     and length score. The length score is determined by the sentences in the paragraph. The idea
     is that the marginal information added by incremental sentences to the paragraph decreases, hence
     a square root of the value is taken as an indicator.
+    Two hyperparameters - β_0 and β_1.
     β_0(0.9) is chosen as the importance of normalized tf-idf and β_1(0.1) is chosen as the 
     importance of length.
     '''
