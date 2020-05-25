@@ -17,7 +17,7 @@ with open('abbreviations.mapper', 'r') as file:
 paragraph_separator = '\n\n'
 sentence_separator = ' '
 token_separator = ' '
-unnecessary_identifier_regex = '[0-9\[\]%/,()–\'<>^~`@|#$+:;]'
+unnecessary_identifier_regex = '[0-9\[\]%/,()–\'<>^~`@|#$+:;’]'
 unnecessary_space = '  '
 unnecessary_unresolved_pron = '-PRON-'
 unnecessary_apostrophe = ' \''
