@@ -23,20 +23,18 @@ def load_sentence_vectorizer() -> keras.Model:
     sent2vec_model = keras.models.load_model(model_paths['sentence-encoder-path'])
     return sent2vec_model
 
-def find_clusters_and_noise(sentence_vector_lookup: Dict[int, np.ndarray]) -> (List[List[str]], List[str]):
+def find_clusters_and_noise(sentence_vector_lookup: Dict[int, np.ndarray]) -> (List[List[int]], List[int]):
     '''
     This method finds the sentence clusters in the given data. It returns the clusters, and the
     noisy sentences (which don't belong to any cluster).
     Three hyperparameters - 
     1. ρ_0
-    2. ρ_thres
-    3. δ_thres
+    2. γ_thres
     ρ_0 defines the threshold density at any point below which, the point can be considered as noise.
-    ρ_thres and δ_thres together define the region in the decision graph which contain cluster centres
+    γ_thres defines the region in the decision graph which contain cluster centres
     '''
-    rho_0 = 0.3 
-    rho_thres = 0.5
-    delta_thres = 0.5
+    rho_0 = 0.50
+    gamma_thres = 0.20
 
     density_estimates = _estimate_density(sentence_vector_lookup)
     delta_values = _find_delta(sentence_vector_lookup, density_estimates)
@@ -54,18 +52,39 @@ def find_clusters_and_noise(sentence_vector_lookup: Dict[int, np.ndarray]) -> (L
         density = density_estimates[data_pt]
         delta = delta_values[data_pt]
 
-        if density >= rho_thres and delta >= delta_thres:
+        if density * delta > gamma_thres:
             density_peak_pt = data_pt
             cluster_centres.append(density_peak_pt)
     
-    clusters = {centre: [] for centre in cluster_centres}
+    if len(cluster_centres) == 0:
+        # No clusters found, all sentences returned as noise
+        return None, list(sentence_vector_lookup.keys())
+    
+    clusters = {center: [] for center in cluster_centres}
+    noisy_data = []
 
-    plt.scatter(list(density_estimates.values()), list(delta_values.values()))
-    plt.xlabel('ρ')
-    plt.ylabel('δ')
-    plt.savefig('decision_graph.png')
+    for data_pt, density in density_estimates.items():
+        if density < rho_0: 
+            noisy_data.append(data_pt)
+            continue
+        belonging_cluster_centre = _assign_cluster(cluster_centres, data_pt, sentence_vector_lookup)
+        clusters[belonging_cluster_centre].append(data_pt)
 
-    pass
+    deletable = []
+    for center, cluster in clusters.items():
+        if len(cluster) == 0:
+            # This means that this is a duplicate sentence, and has been
+            # taken care of in some other cluster. Hence such clusters can be omitted
+            deletable.append(center)
+
+    for center in deletable:
+        del clusters[center]
+
+    for center, cluster in clusters.items():
+        print('Center: {}, Density: {}, Delta: {}'.format(center, density_estimates[center], delta_values[center]))
+        if len(cluster) == 0: print('Empty cluster: {}'.format(center))
+
+    return list(clusters.values()), noisy_data
 
 def _estimate_density(sentence_vector_lookup: Dict[int, float]) -> Dict[int, float]:
     '''
@@ -115,7 +134,23 @@ def _find_delta(sentence_vector_lookup: Dict[int, np.ndarray], density_map: Dict
 
     return delta_map
 
-def _find_distance(vector_one: np.ndarray, vector_two: np.ndarray, norm_raise: float) -> float:
+def _assign_cluster(cluster_centres: List[int], data_pt: int, vector_lookup_table: Dict[int, np.ndarray]) -> int:
+    distances = {}
+    for center in cluster_centres:
+        distance = _find_distance(vector_lookup_table[center], vector_lookup_table[data_pt])
+        distances[center] = distance
+
+    min_dist = float('inf')
+    min_dist_ctr = None
+
+    for center, distance in distances.items():
+        if distance < min_dist:
+            min_dist = distance
+            min_dist_ctr = center
+
+    return min_dist_ctr
+
+def _find_distance(vector_one: np.ndarray, vector_two: np.ndarray, norm_raise: float = 0.5) -> float:
     '''
     This method calculates the distance based on the input norm order.
     '''
