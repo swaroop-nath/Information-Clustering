@@ -19,7 +19,7 @@ def summarize_docs(docs: List[str]) -> str:
 
     logging.info('method: summarize_docs- Extracting top_k paragraphs from the document')
     for doc in docs:
-        mapper, top_k = extract_top_k_paragraphs(doc, abbrevs)
+        mapper, top_k = extract_top_k_paragraphs(doc, abbrevs, k = 50)
         if sentence_mapper is None: sentence_mapper = mapper
         else: sentence_mapper.update(mapper)
         important_paragraphs.append(top_k)
@@ -28,8 +28,11 @@ def summarize_docs(docs: List[str]) -> str:
     final_doc, final_sentence_mapper = _process_output(sentence_mapper, important_paragraphs)
     del sentence_mapper, important_paragraphs
 
+    with open('final_doc.dat', 'w') as file:
+        file.write(final_doc)
+
     logging.info('method: summarize_docs- Starting clustering of sentences in important paragraphs')
-    # extract_clusters(final_doc)
+    clusters, noisy_data = extract_clusters(final_doc)
     pass
 
 def _process_output(sentence_mapper: Dict[str, str], list_of_important_paragraphs: List[str]) -> (str, Dict[str, str]):

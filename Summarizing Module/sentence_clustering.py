@@ -17,7 +17,19 @@ def extract_clusters(text_doc: str) -> List[List[str]]:
     logging.info('method: extract_clusters- Find clusters in the document')
     clusters, noisy_data = find_clusters_and_noise(vector_lookup_table)
 
-    return clusters, noisy_data
+    processed_clusters = []
+    processed_noise = []
+
+    for cluster in clusters:
+        temporary = []
+        for data_pt in cluster:
+            temporary.append(sentence_lookup_table[data_pt])
+        processed_clusters.append(temporary)
+
+    for noise in noisy_data:
+        processed_noise.append(sentence_lookup_table[noise])
+
+    return processed_clusters, processed_noise
 
 def _vectorize_sentences(sentences: List[str]) -> (Dict[int, np.ndarray], Dict[int, str]):
     '''

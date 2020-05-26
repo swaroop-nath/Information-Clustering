@@ -80,10 +80,6 @@ def find_clusters_and_noise(sentence_vector_lookup: Dict[int, np.ndarray]) -> (L
     for center in deletable:
         del clusters[center]
 
-    for center, cluster in clusters.items():
-        print('Center: {}, Density: {}, Delta: {}'.format(center, density_estimates[center], delta_values[center]))
-        if len(cluster) == 0: print('Empty cluster: {}'.format(center))
-
     return list(clusters.values()), noisy_data
 
 def _estimate_density(sentence_vector_lookup: Dict[int, float]) -> Dict[int, float]:
@@ -135,6 +131,9 @@ def _find_delta(sentence_vector_lookup: Dict[int, np.ndarray], density_map: Dict
     return delta_map
 
 def _assign_cluster(cluster_centres: List[int], data_pt: int, vector_lookup_table: Dict[int, np.ndarray]) -> int:
+    '''
+    Assigning data points to cluster_centres obtained.
+    '''
     distances = {}
     for center in cluster_centres:
         distance = _find_distance(vector_lookup_table[center], vector_lookup_table[data_pt])
