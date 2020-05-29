@@ -28,9 +28,6 @@ def summarize_docs(docs: List[str]) -> str:
     final_doc, final_sentence_mapper = _process_output(sentence_mapper, important_paragraphs)
     del sentence_mapper, important_paragraphs
 
-    with open('final_doc.dat', 'w') as file:
-        file.write(final_doc)
-
     logging.info('method: summarize_docs- Starting clustering of sentences in important paragraphs')
     clusters, noisy_data = extract_clusters(final_doc)
     pass

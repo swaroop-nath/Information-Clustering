@@ -1,12 +1,14 @@
 import re
 from spacy.lang.en.stop_words import STOP_WORDS as stop_words_list
 import numpy as np
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from normalise import normalise
 import manager as mgr
+from nltk.tree import Tree
 from nltk.tokenize import sent_tokenize, word_tokenize
 from abbreviations import schwartz_hearst
-from utils import load_sentence_vectorizer
+from utils import load_sentence_vectorizer, load_text_chunker_model
+import matplotlib.pyplot as plt
 
 def simple_pre_process(text_doc: str) -> str:
     '''
@@ -226,7 +228,6 @@ def find_abbreviations(text_docs: List[str]) ->Dict[str, str]:
         found = schwartz_hearst.extract_abbreviation_definition_pairs(doc_text=doc, most_common_definition=True)
         pairs.update(found)
     return pairs
-    pass
 
 def vectorize_sentence(sentence: str) -> np.ndarray:
     '''
@@ -236,5 +237,42 @@ def vectorize_sentence(sentence: str) -> np.ndarray:
     vectorizer = load_sentence_vectorizer()
     return vectorizer([sentence]).numpy()
 
-def produce_chunk_graph(cluster: List[str]):
-    pass
+def get_chunks(sentence: str) -> List[str]:
+    '''
+    This method is responsible for getting the chunks present in a sentence. It returns the chunks found.
+    '''
+    tagged_sentence = _get_pos_tags(sentence)
+    text_chunker_model = load_text_chunker_model()
+
+    chunk_tree = text_chunker_model.parse(tagged_sentence)
+
+    chunks = []
+    for chunk in chunk_tree:
+        chunk_texts = []
+        
+        if type(chunk) is Tree:
+            # This chunk is a phrase
+            for token, _ in chunk:
+                chunk_texts.append(token)
+        else:
+            # This chunk is a word
+            chunk_texts.append(chunk[0])
+
+        text = mgr.token_separator.join(chunk_texts)
+        chunks.append(text)
+
+    return chunks
+    
+def _get_pos_tags(sentence: str) -> List[Tuple[str, str]]:
+    '''
+    This method serves the purpose of extracting the parts-of-speech tags for all the
+    words of a given sentence.
+    '''
+    spacy_doc = mgr.spacy_tool(sentence)
+
+    tagged_sentence = []
+    for token in spacy_doc:
+        tagged_token = (token.text, token.tag_)
+        tagged_sentence.append(tagged_token)
+
+    return tagged_sentence

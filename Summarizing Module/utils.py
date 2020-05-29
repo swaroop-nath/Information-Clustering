@@ -6,9 +6,12 @@ import numpy as np
 from sklearn.neighbors import KernelDensity
 import matplotlib.pyplot as plt
 import logging
+from chunker import NGramTagChunker
+from pickle import load
 
 model_paths = None
 sent2vec_model = None
+text_chunker_model = None
 
 def _load_model_path_props():
     global model_paths
@@ -22,6 +25,15 @@ def load_sentence_vectorizer() -> keras.Model:
     if sent2vec_model is not None: return sent2vec_model
     sent2vec_model = keras.models.load_model(model_paths['sentence-encoder-path'])
     return sent2vec_model
+
+def load_text_chunker_model() -> NGramTagChunker:
+    if model_paths is None: _load_model_path_props()
+    global text_chunker_model
+    if text_chunker_model is not None: return text_chunker_model
+    with open(model_paths['text-chunker-path'], 'rb') as file:
+        text_chunker_model = load(file)
+    
+    return text_chunker_model
 
 def find_clusters_and_noise(sentence_vector_lookup: Dict[int, np.ndarray]) -> (List[List[int]], List[int]):
     '''
