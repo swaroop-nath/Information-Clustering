@@ -133,7 +133,7 @@ def _find_delta(sentence_vector_lookup: Dict[int, np.ndarray], density_map: Dict
         for data_pt_two, density_two in density_map.items():
             if data_pt_one == data_pt_two: continue
             if density_one >= density_two and not FLAG_MAX_DENSITY: continue
-            distance = _find_distance(vector_one=sentence_vector_lookup[data_pt_one], 
+            distance = find_distance(vector_one=sentence_vector_lookup[data_pt_one], 
                             vector_two=sentence_vector_lookup[data_pt_two], norm_raise=p)
             delta_array.append(distance)
         
@@ -148,7 +148,7 @@ def _assign_cluster(cluster_centres: List[int], data_pt: int, vector_lookup_tabl
     '''
     distances = {}
     for center in cluster_centres:
-        distance = _find_distance(vector_lookup_table[center], vector_lookup_table[data_pt])
+        distance = find_distance(vector_lookup_table[center], vector_lookup_table[data_pt])
         distances[center] = distance
 
     min_dist = float('inf')
@@ -161,7 +161,7 @@ def _assign_cluster(cluster_centres: List[int], data_pt: int, vector_lookup_tabl
 
     return min_dist_ctr
 
-def _find_distance(vector_one: np.ndarray, vector_two: np.ndarray, norm_raise: float = 0.5) -> float:
+def find_distance(vector_one: np.ndarray, vector_two: np.ndarray, norm_raise: float = 0.5) -> float:
     '''
     This method calculates the distance based on the input norm order.
     '''

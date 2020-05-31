@@ -5,7 +5,7 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 from text_utils import simple_pre_process, rigorous_pre_process, tf_idf
 import logging
 
-def extract_top_k_paragraphs(text_doc: str, abbrevs, k: int = 10) -> (Dict[str, str], str):
+def extract_top_k_paragraphs(text_doc: str, abbrevs: Dict[str, str], k: int = 10) -> (Dict[str, str], str):
     '''
     This method is used to extract the top k paragraphs in the document. It returns a tuple
     of a sentence mapper and the list of top k paragraphs.

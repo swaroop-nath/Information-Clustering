@@ -1,13 +1,15 @@
 from typing import List, Dict
-from text_utils import get_chunks, simple_pre_process, rigorous_pre_process, tf_idf
+from text_utils import get_chunks, simple_pre_process, rigorous_pre_process, tf_idf, vectorize_sentence
+from utils import find_distance
 import manager as mgr
+from nltk.tokenize import word_tokenize
 
 def extract_possible_path(cluster: List[str], abbrevs: List[str]) -> str:
     are_all_sentences_same = _check_for_similarity(cluster)
     if are_all_sentences_same: return cluster[0]
 
-    chunk_graph = _construct_chunk_graph(cluster)
-    possible_paths = _get_possible_paths(chunk_graph, word_tf_idf)
+    chunk_graph, chunk_mapper, word_tf_idf = _construct_chunk_graph(cluster, abbrevs)
+    possible_paths = _get_possible_paths(chunk_graph, chunk_mapper, word_tf_idf)
 
 def _check_for_similarity(cluster: List[str]) -> str:
     for reader in range(len(cluster - 1)):
@@ -16,16 +18,9 @@ def _check_for_similarity(cluster: List[str]) -> str:
 
     return True
 
-def _get_tf_idf_values(cluster: List[str], abbrevs: List[str]) -> Dict[str, float]:
-    text_doc = mgr.paragraph_separator.join(cluster)
-    simple_preprocessed_doc = simple_pre_process(text_doc=text_doc)
-    _, rigorously_preprocessed_doc = rigorous_pre_process(text_doc=simple_processed_doc, abbrevs=abbrevs)
-    tf_idf_values = tf_idf(text_doc=rigorously_preprocessed_doc)
-    
-    return tf_idf_values
-
-def _construct_chunk_graph(cluster: List[str]) -> Dict[str, List[str]]:
+def _construct_chunk_graph(cluster: List[str], abbrevs: Dict[str, str]) -> (Dict[str, List[str]], Dict[str, str], Dict[str, float]):
     sentence_wise_chunks = _chunk_sentences(cluster)
+    chunk_mapper, word_tf_idf = _get_tf_idf_values(sentence_wise_chunks, abbrevs)
     global START_TOKEN
     global END_TOKEN
     START_TOKEN = '<<START>>'
@@ -46,7 +41,22 @@ def _construct_chunk_graph(cluster: List[str]) -> Dict[str, List[str]]:
     for start_node, children_nodes in chunk_graph.items():
         chunk_graph[start_node] = list(set(children_nodes))
 
-    return chunk_graph
+    return chunk_graph, chunk_mapper, word_tf_idf
+
+def _get_tf_idf_values(sentence_wise_chunks: List[str], abbrevs: Dict[str, str]) -> Dict[str, float]:
+    flattend_doc = [chunk for sentence in sentence_wise_chunks for chunk in sentence]
+    chunk_mapper = {}
+    tf_idf_values = {}
+    
+    for chunk in flattend_doc:
+        simple_processed_doc = simple_pre_process(text_doc=chunk)
+        mapper, rigorously_preprocessed_doc = rigorous_pre_process(text_doc=simple_processed_doc, abbrevs=abbrevs)
+        values = tf_idf(text_doc=rigorously_preprocessed_doc)
+
+        chunk_mapper.update(mapper)
+        tf_idf_values.update(values)
+    
+    return chunk_mapper, tf_idf_values
 
 def _chunk_sentences(cluster: List[str]) -> List[List[str]]:
     sentence_wise_chunks = []
@@ -57,11 +67,25 @@ def _chunk_sentences(cluster: List[str]) -> List[List[str]]:
 
     return sentence_wise_chunks
 
-def _get_possible_paths(chunk_graph: Dict[str, List[str]], tf_idf_values: Dict[str, float]) -> List[str]:
+def _get_possible_paths(chunk_graph: Dict[str, List[str]], chunk_mapper: Dict[str, str], tf_idf_values: Dict[str, float], k: int = 2) -> List[str]:
     global START_TOKEN
     global END_TOKEN
     possible_paths = []
-    beam = chunk_graph[START_TOKEN]
+    beam = [(chunk, path_number) for path_number, chunk in enumerate(chunk_graph[START_TOKEN])]
+    reverse_chunk_mapper = {v: k for k, v in chunk_mapper.items()}
 
     while len(beam) > 0:
-        pass
+        chunk, path_id = beam.pop(0)
+        processed_chunk = reverse_chunk_mapper[chunk]
+
+        for word in word_tokenize(processed_chunk):
+            if tf_idf_values.get(word) is None:
+                tf_idf_score += 0.40
+            else: tf_idf_score += tf_idf_values[word]
+
+        distance_scores = []
+        vectorized_chunk = vectorize_sentence(chunk)
+        for prev_chunk in possible_paths[path_id]:
+            vectorized_repr = vectorize_sentence(prev_chunk)
+            distance = find_distance(vectorized_chunk, vectorized_repr)
+            # distance_scores
