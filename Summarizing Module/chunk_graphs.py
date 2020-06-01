@@ -4,6 +4,13 @@ from utils import find_distance
 import manager as mgr
 from nltk.tokenize import word_tokenize
 
+class UndefinedChunkError(Exception):
+    def __init__(self, message):
+        self.message = message
+    
+    def get_message(self):
+        return self.message
+
 def extract_possible_path(cluster: List[str], abbrevs: List[str]) -> str:
     are_all_sentences_same = _check_for_similarity(cluster)
     if are_all_sentences_same: return cluster[0]
@@ -103,7 +110,9 @@ def _get_possible_paths(chunk_graph: Dict[str, List[str]], chunk_mapper: Dict[st
             if child_chunk == END_TOKEN: 
                 FLAG_END_TOKEN_CHILD = True
                 continue
-            heuristic_val = _get_heuristic_value(child_chunk, reverse_chunk_mapper, tf_idf_values, possible_paths[path_id])
+            try:
+                heuristic_val = _get_heuristic_value(child_chunk, reverse_chunk_mapper, tf_idf_values, possible_paths[path_id])
+            except: heuristic_scores[child_chunk] = float('inf')
             heuristic_scores[child_chunk] = heuristic_val
 
         reverse_sorted_chunks = sorted(heuristic_scores, key=heuristic_scores.get, reverse=True)
@@ -129,6 +138,8 @@ def _reverse_chunk_map(chunk_map: Dict[str, List[str]]) -> Dict[str, str]:
 
 def _get_heuristic_value(chunk: str, mapper: Dict[str, str], tf_idf_values: Dict[str, float], path: List[str]) -> float:
     processed_chunk = mapper.get(chunk)
+    if processed_chunk is None: raise UndefinedChunkError('Chunk omitted during pre-processing.')
+
     vectorized_chunk = vectorize_sentence(processed_chunk)
     avg_tf_idf = sum(tf_idf_values.values()) / len(tf_idf_values)
 
