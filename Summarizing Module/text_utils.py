@@ -37,7 +37,7 @@ def simple_pre_process(text_doc: str) -> str:
 
     return final_doc
 
-def rigorous_pre_process(text_doc: str, abbrevs: Dict[str, str]) -> (Dict[str, str], str):
+def rigorous_pre_process(text_doc: str, abbrevs: Dict[str, str], remove_stop_words: bool = True) -> (Dict[str, str], str):
     '''
     This is meant to be an extensive pre-processing procedure. It does assume that simple preprocessing has been done on the
     text. It further extends the pre-processing to lower-casing the text, removal of apostrophes'/expansion of abbreviations,
@@ -86,7 +86,7 @@ def rigorous_pre_process(text_doc: str, abbrevs: Dict[str, str]) -> (Dict[str, s
     # Removing stop words and lower-casing the text
     stop_word_free_paragraphs = []
     for paragraph in cleaned_paragraphs:
-        stop_word_free_paragraph = _remove_stop_words_and_lower_case(paragraph)
+        stop_word_free_paragraph = _remove_stop_words_and_lower_case(paragraph, remove_stop_words)
         stop_word_free_paragraphs.append(stop_word_free_paragraph)
     del cleaned_paragraphs
 
@@ -139,10 +139,11 @@ def _normalize_paragraph(paragraph: str, user_abbrevs: str) -> str:
     processed_paragraph = mgr.sentence_separator.join(normalised_sentences)
     return processed_paragraph
 
-def _remove_stop_words_and_lower_case(paragraph: str) -> str:
+def _remove_stop_words_and_lower_case(paragraph: str, remove_stop_words: bool) -> str:
     processed_sentences = []
     for sentence in sent_tokenize(paragraph):
-        processed_words = [token.lower() for token in word_tokenize(sentence) if token not in stop_words_list]
+        if remove_stop_words: processed_words = [token.lower() for token in word_tokenize(sentence) if token not in stop_words_list]
+        else: processed_words = [token.lower() for token in word_tokenize(sentence)]
         processed_sentence = mgr.token_separator.join(processed_words)
         processed_sentences.append(processed_sentence)
     

@@ -24,6 +24,7 @@ unnecessary_apostrophe = ' \''
 unnecessary_space_period = ' \.'
 
 expander = Contractions(api_key = 'glove-wiki-gigaword-50')
+expander.expand_texts(['loader_demo_text'])
 
 spacy_tool = spacy.load('en')
 neuralcoref.add_to_pipe(spacy_tool)
