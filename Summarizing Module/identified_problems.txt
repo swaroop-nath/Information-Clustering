@@ -1,0 +1,2 @@
+1. Bifurcations in the graph has been dealt with correctly, like branching from path 2 to 2 and 21. But, have amalgamations been dealt with/considered? Do they need separate treatment.
+2. The loop seems to run infinitely. Check if it actually runs infinitely or it takes huge time.
