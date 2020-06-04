@@ -12,6 +12,7 @@ from pickle import load
 model_paths = None
 sent2vec_model = None
 text_chunker_model = None
+language_model = None
 
 def _load_model_path_props():
     global model_paths
@@ -20,6 +21,7 @@ def _load_model_path_props():
     model_paths = dict(config.items('MODEL_PATHS'))
 
 def load_sentence_vectorizer() -> keras.Model:
+    global model_paths
     if model_paths is None: _load_model_path_props()
     global sent2vec_model
     if sent2vec_model is not None: return sent2vec_model
@@ -27,6 +29,7 @@ def load_sentence_vectorizer() -> keras.Model:
     return sent2vec_model
 
 def load_text_chunker_model() -> NGramTagChunker:
+    global model_paths
     if model_paths is None: _load_model_path_props()
     global text_chunker_model
     if text_chunker_model is not None: return text_chunker_model
@@ -34,6 +37,13 @@ def load_text_chunker_model() -> NGramTagChunker:
         text_chunker_model = load(file)
     
     return text_chunker_model
+
+def load_language_model():
+    global model_paths
+    if model_paths is None: _load_model_path_props()
+    global language_model
+    if language_model is not None: return language_model
+    # Load model and return it.
 
 def find_clusters_and_noise(sentence_vector_lookup: Dict[int, np.ndarray]) -> (List[List[int]], List[int]):
     '''

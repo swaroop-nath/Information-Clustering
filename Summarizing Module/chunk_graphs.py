@@ -1,8 +1,9 @@
 from typing import List, Dict
 from text_utils import get_chunks, simple_pre_process, rigorous_pre_process, tf_idf, vectorize_sentence
-from utils import find_distance
+from utils import find_distance, load_language_model
 import manager as mgr
 from nltk.tokenize import word_tokenize
+from nltk.tokenize.treebank import TreebankWordDetokenizer
 import logging
 from copy import copy
 
@@ -24,6 +25,8 @@ def extract_possible_path(cluster: List[str], abbrevs: List[str]) -> str:
     chunk_graph, chunk_mapper, word_tf_idf = _construct_chunk_graph(cluster, abbrevs)
     logging.info('method: extract_possible_path- Getting the possible paths in the Chunk Graph')
     possible_paths = _get_possible_paths(chunk_graph, chunk_mapper, word_tf_idf)
+    logging.info('method: extract_possible_path- Scoring each path based on a language model')
+    filtered_path = _get_most_plausible_path(possible_paths)
     
     return possible_paths
 
@@ -106,7 +109,13 @@ def _get_possible_paths(chunk_graph: Dict[str, List[str]], chunk_mapper: Dict[st
         END_TOKEN_CHILD = -1
         chunk, path_id = beam.pop(0)
         if possible_paths.get(path_id) is None: possible_paths[path_id] = [chunk]
-        else: possible_paths[path_id].append(chunk)
+        else: 
+            is_duplicate_available = _check_path_traversed(possible_paths[path_id], chunk)
+            if is_duplicate_available:
+                # Caught in a cyclic loop
+                del possible_paths[path_id]
+                continue
+            possible_paths[path_id].append(chunk)
 
         # Checking for children nodes, and judging value of adding them to the path based on a heuristic value
         children_chunks = chunk_graph[chunk]
@@ -138,15 +147,23 @@ def _get_possible_paths(chunk_graph: Dict[str, List[str]], chunk_mapper: Dict[st
         for idx, chunk in enumerate(reverse_sorted_chunks):
             if idx < k:
                 if idx == END_TOKEN_CHILD: continue
-                if idx == 0 or (END_TOKEN_CHILD == 0 and idx == 1): beam.append((chunk, path_id))
                 else: 
                     new_path_id = path_id + str(idx)
                     # Copying the previous path for the new diverged path
                     possible_paths[new_path_id] = copy(possible_paths[path_id])
                     beam.append((chunk, new_path_id))
+        del possible_paths[path_id]
 
     logging.info('method: _get_possible_paths- Beam Search over, extracted paths in the graph')
-    return list(possible_paths.values())
+
+    final_paths = []
+    detokenizer = TreebankWordDetokenizer()
+    for path in possible_paths.values():
+        string_path = detokenizer.detokenize(path)
+        if len(word_tokenize(string_path)) >= 8:
+            final_paths.append(string_path)
+    
+    return final_paths
 
 def _reverse_chunk_map(chunk_map: Dict[str, List[str]]) -> Dict[str, str]:
     reverse_chunk_map = {}
@@ -178,3 +195,13 @@ def _get_heuristic_value(chunk: str, mapper: Dict[str, str], tf_idf_values: Dict
     heuristic_val = tf_idf_score + min(distances)
 
     return heuristic_val
+
+def _check_path_traversed(path: List[str], new_chunk: str) -> bool:
+    tuple_to_be_checked = (path[-1], new_chunk)
+    for chunk_one, chunk_two in zip(path[:-1], path[1:]):
+        if chunk_one == tuple_to_be_checked[0] and chunk_two == tuple_to_be_checked[1]: return True
+    
+    return False
+
+def _get_most_plausible_path(paths: List[str]) -> str:
+    pass
