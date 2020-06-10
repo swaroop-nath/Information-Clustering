@@ -1,6 +1,6 @@
 from typing import List, Dict
 from text_utils import get_chunks, simple_pre_process, rigorous_pre_process, tf_idf, vectorize_sentence
-from utils import find_distance, load_language_model
+from utils import find_distance, load_language_model, compute_sentence_plausibility
 import manager as mgr
 from nltk.tokenize import word_tokenize
 from nltk.tokenize.treebank import TreebankWordDetokenizer
@@ -28,7 +28,7 @@ def extract_possible_path(cluster: List[str], abbrevs: List[str]) -> str:
     logging.info('method: extract_possible_path- Scoring each path based on a language model')
     filtered_path = _get_most_plausible_path(possible_paths)
     
-    return possible_paths
+    return filtered_path
 
 def _check_for_similarity(cluster: List[str]) -> str:
     for reader in range(len(cluster) - 1):
@@ -204,4 +204,13 @@ def _check_path_traversed(path: List[str], new_chunk: str) -> bool:
     return False
 
 def _get_most_plausible_path(paths: List[str]) -> str:
-    pass
+    max_score = -float('inf')
+    max_score_sentence = ''
+    for sentence in paths:
+        plausibility_score = compute_sentence_plausibility(sentence)
+        if plausibility_score > max_score:
+            max_score = plausibility_score
+            max_score_sentence = sentence
+
+    return max_score_sentence
+    

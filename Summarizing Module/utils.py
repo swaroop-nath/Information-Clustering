@@ -10,15 +10,25 @@ from chunker import NGramTagChunker
 from pickle import load
 
 model_paths = None
+constant_props = None
 sent2vec_model = None
 text_chunker_model = None
 language_model = None
+char2idx = None
+idx2char = None
+vocab = None
 
 def _load_model_path_props():
     global model_paths
     config = configparser.RawConfigParser()
     config.read('models.properties')
     model_paths = dict(config.items('MODEL_PATHS'))
+
+def _load_constant_props():
+    global constant_props
+    config = configparser.RawConfigParser()
+    config.read('models.properties')
+    constant_props = dict(config.items('CONSTANTS'))
 
 def load_sentence_vectorizer() -> keras.Model:
     global model_paths
@@ -40,10 +50,30 @@ def load_text_chunker_model() -> NGramTagChunker:
 
 def load_language_model():
     global model_paths
+    global constant_props
     if model_paths is None: _load_model_path_props()
+    if constant_props is None: _load_constant_props()
     global language_model
     if language_model is not None: return language_model
-    # Load model and return it.
+    language_model = keras.models.load_model(model_paths['language-model-path'])
+    _load_meta_data_for_language_model()
+
+def _load_meta_data_for_language_model():
+    global vocab
+    global char2idx
+    global idx2char
+    
+    meta_data_base_path = model_paths['language-model-meta-data-path']
+    vocab_file_path = meta_data_base_path + '/final_vocab.ls'
+    char2idx_file_path = meta_data_base_path + '/char2idx.map'
+    idx2char_file_path = meta_data_base_path + '/idx2char.map'
+
+    with open(vocab_file_path, 'rb') as file:
+        vocab = load(file)
+    with open(char2idx_file_path, 'rb') as file:
+        char2idx = load(file)
+    with open(idx2char_file_path, 'rb') as file:
+        idx2char = load(file)
 
 def find_clusters_and_noise(sentence_vector_lookup: Dict[int, np.ndarray]) -> (List[List[int]], List[int]):
     '''
@@ -179,3 +209,34 @@ def find_distance(vector_one: np.ndarray, vector_two: np.ndarray, norm_raise: fl
     distance = np.linalg.norm(difference, ord=norm_raise)
     
     return distance
+
+def _convert_text_to_int(text_string: str) -> np.array:
+    global char2idx
+    text_as_int = []
+    for c in text_string:
+        if char2idx.get(c) is not None: text_as_int.append(char2idx[c])
+    return np.array(text_as_int)
+
+def _split_input_target(batch):
+    input_text = batch[:-1]
+    target_text = batch[-1]
+    return input_text, target_text    
+
+def compute_sentence_plausibility(sentence: str) -> float:
+    global language_model
+    load_language_model()
+    SEQ_LEN = int(constant_props['language-model-sequence-length'])
+    sentence_as_int_array = _convert_text_to_int(sentence)
+    sentence_as_dataset = tf.data.Dataset.from_tensor_slices(sentence_as_int_array)
+    batched_dataset = sentence_as_dataset.window(size=SEQ_LEN + 1, shift=1, drop_remainder=True)
+    input_target_split_sentence = batched_dataset.flat_map(lambda window: window.batch(SEQ_LEN + 1)).map(_split_input_target)
+
+    total_probability = 0
+    count = 0
+
+    for input_text, target_text in input_target_split_sentence.__iter__():
+        predictions = language_model(tf.reshape(input_text, shape=(1, SEQ_LEN)))
+        total_probability += predictions[0, SEQ_LEN - 1, target_text].numpy()
+        count += 1
+
+    return total_probability / count
