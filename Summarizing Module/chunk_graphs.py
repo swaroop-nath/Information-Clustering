@@ -17,14 +17,21 @@ class UndefinedChunkError(Exception):
     def get_message(self):
         return self.message
 
-def extract_possible_path(cluster: List[str], abbrevs: List[str]) -> str:
-    are_all_sentences_same = _check_for_similarity(cluster)
-    if are_all_sentences_same: return cluster[0]
+def extract_possible_path(processed_cluster: List[str], mapper: Dict[str, str], abbrevs: List[str]) -> str:
+    are_all_sentences_same = _check_for_similarity(processed_cluster)
+    if are_all_sentences_same: return mapper[processed_cluster[0]]
+
+    cluster = []
+    for sentence in processed_cluster:
+        cluster.append(mapper[sentence])
 
     logging.info('method: extract_possible_path- Constructing Chunk Graph')
     chunk_graph, chunk_mapper, word_tf_idf = _construct_chunk_graph(cluster, abbrevs)
     logging.info('method: extract_possible_path- Getting the possible paths in the Chunk Graph')
     possible_paths = _get_possible_paths(chunk_graph, chunk_mapper, word_tf_idf)
+    del chunk_graph
+    del chunk_mapper
+    del word_tf_idf
     logging.info('method: extract_possible_path- Scoring each path based on a language model')
     filtered_path = _get_most_plausible_path(possible_paths)
     
@@ -104,10 +111,18 @@ def _get_possible_paths(chunk_graph: Dict[str, List[str]], chunk_mapper: Dict[st
     beam = [(chunk, str(path_number)) for path_number, chunk in enumerate(chunk_graph[START_TOKEN])]
     reverse_chunk_mapper = _reverse_chunk_map(chunk_mapper)
 
+    loop_count = 1
+    traversed_nodes = []
     logging.info('method: _get_possible_paths- Starting Beam Search . . . . ') 
     while len(beam) > 0:
+        if loop_count % 200 == 0: print('Multiple of 50 done')
+        if loop_count == 4000: 
+            with open('tr_nodes.txt', 'w') as file: file.write(str(traversed_nodes))
+            break
+        loop_count += 1
         END_TOKEN_CHILD = -1
         chunk, path_id = beam.pop(0)
+        traversed_nodes.append(chunk)
         if possible_paths.get(path_id) is None: possible_paths[path_id] = [chunk]
         else: 
             is_duplicate_available = _check_path_traversed(possible_paths[path_id], chunk)
@@ -141,18 +156,21 @@ def _get_possible_paths(chunk_graph: Dict[str, List[str]], chunk_mapper: Dict[st
                 # an abbreviation inside braces.
                 heuristic_val = float('inf')
             heuristic_scores[child_chunk] = heuristic_val
+        del children_chunks
 
         reverse_sorted_chunks = sorted(heuristic_scores, key=heuristic_scores.get, reverse=True)
+        del heuristic_scores
 
         for idx, chunk in enumerate(reverse_sorted_chunks):
             if idx < k:
                 if idx == END_TOKEN_CHILD: continue
                 else: 
-                    new_path_id = path_id + str(idx)
+                    new_path_id = path_id + '-' + str(idx)
                     # Copying the previous path for the new diverged path
                     possible_paths[new_path_id] = copy(possible_paths[path_id])
                     beam.append((chunk, new_path_id))
         del possible_paths[path_id]
+        del reverse_sorted_chunks
 
     logging.info('method: _get_possible_paths- Beam Search over, extracted paths in the graph')
 

@@ -35,6 +35,8 @@ def simple_pre_process(text_doc: str) -> str:
     for regex in non_printable_regex:
         final_doc = re.sub(regex, '', final_doc)
 
+    # final_doc = re.sub(mgr.unnecessary_space, ' ', final_doc)
+
     return final_doc
 
 def rigorous_pre_process(text_doc: str, abbrevs: Dict[str, str], remove_stop_words: bool = True) -> (Dict[str, str], str):

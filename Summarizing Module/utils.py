@@ -85,7 +85,7 @@ def find_clusters_and_noise(sentence_vector_lookup: Dict[int, np.ndarray]) -> (L
     ρ_0 defines the threshold density at any point below which, the point can be considered as noise.
     γ_thres defines the region in the decision graph which contain cluster centres
     '''
-    rho_0 = 0.50
+    rho_0 = 0.80
     gamma_thres = 0.20
 
     density_estimates = _estimate_density(sentence_vector_lookup)
