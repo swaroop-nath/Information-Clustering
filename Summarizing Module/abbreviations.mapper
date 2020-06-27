@@ -119,5 +119,13 @@
 'A.I.D.S': 'Acquired Immunodeficiency Syndrome',
 'i.e.': 'that is',
 'ie': 'that is',
-'ie.': 'that is'
+'ie.': 'that is',
+'CIA': 'Central Intelligence Agency',
+'C.I.A.': 'Central Intelligence Agency',
+'CIA.': 'Central Intelligence Agency',
+'C.I.A': 'Central Intelligence Agency',
+'FBI': 'Federal Bureau of Investigation',
+'F.B.I.': 'Federal Bureau of Investigation',
+'FBI.': 'Federal Bureau of Investigation',
+'F.B.I': 'Federal Bureau of Investigation'
 }

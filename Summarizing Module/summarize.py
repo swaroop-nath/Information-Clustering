@@ -1,11 +1,10 @@
 from typing import List, Dict
 from paragraph_ranking import extract_top_k_paragraphs
 from sentence_clustering import extract_clusters
-from text_utils import find_abbreviations, rigorous_pre_process
+from text_utils import find_abbreviations, rigorous_pre_process, tokenize_to_sentences
 from sentence_ranking import rank_sentences
 from chunk_graphs import extract_possible_path
 import manager as mgr
-from nltk import sent_tokenize
 import logging
 from time import time
 import pickle as pkl
@@ -91,7 +90,7 @@ def _process_output_imp_para(sentence_mapper: Dict[str, str], list_of_important_
 
     for imp_paragraphs in list_of_important_paragraphs:
         for paragraph in imp_paragraphs.split('\n\n'):
-            for sentence in sent_tokenize(paragraph):
+            for sentence in tokenize_to_sentences(paragraph):
                 final_mapper[sentence] = sentence_mapper[sentence]
 
     return doc, final_mapper

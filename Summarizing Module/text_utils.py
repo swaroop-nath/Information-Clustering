@@ -6,10 +6,10 @@ from typing import Dict, List, Tuple
 from normalise import normalise
 import manager as mgr
 from nltk.tree import Tree
-from nltk.tokenize import sent_tokenize, word_tokenize
+from nltk.tokenize import word_tokenize
 from abbreviations import schwartz_hearst
 from utils import load_sentence_vectorizer, load_text_chunker_model
-import matplotlib.pyplot as plt
+from copy import copy
 
 def simple_pre_process(text_doc: str) -> str:
     '''
@@ -34,6 +34,7 @@ def simple_pre_process(text_doc: str) -> str:
     matches = re.findall(mgr.acronym_period_regex, text_doc)
     for match in matches:
         replace_string = re.sub('\.', '', match)
+        match = re.sub('\.', '\\.', match)
         reference_free_doc = re.sub(match, replace_string, reference_free_doc)
 
     final_doc = reference_free_doc
@@ -60,12 +61,16 @@ def rigorous_pre_process(text_doc: str, abbrevs: Dict[str, str], remove_stop_wor
     processed_paragraphs = []
 
     for paragraph in paragraphs:
-        sentences = sent_tokenize(paragraph)
+        sentences = tokenize_to_sentences(paragraph)
         processed_paragraph = []
         for sentence in sentences:
             sentence = str(sentence)
+            # Removing all apostrophes from possessive nouns
+            apostrophe_free_sentence = copy(sentence)
+            for apostrophe_symbol in mgr.accepted_apostrophe_symbols:
+                apostrophe_free_sentence = re.sub(apostrophe_symbol + 's', '', apostrophe_free_sentence)
             # Expanding textual contractions
-            expanded_sentence = _expand_textual_contractions(sentence)
+            expanded_sentence = _expand_textual_contractions(apostrophe_free_sentence)
             # Removing unwanted abbreviations, those inside braces
             cleaned_sentence = _remove_unwanted_abbrev(expanded_sentence, abbrevs)
             # Treating abbreviations, like U.S.A --> United States of America, and also context based abbreviations
@@ -130,7 +135,9 @@ def _do_post_processing(text_doc: str) -> str:
     doc = re.sub(mgr.unnecessary_space, ' ', text_doc)
     doc = re.sub(mgr.unnecessary_space_period, '.', doc)
     doc = re.sub(mgr.unnecessary_apostrophe, '', doc)
-    return doc
+    doc = re.sub(mgr.period_regex, '', doc)
+    if not re.match(mgr.valid_eos_token, doc[-1]): return doc + '.'
+    else: return doc
 
 def _map_sentences(processed_doc: str, unprocessed_sents: List[str]) -> Dict[str, str]:
     read_count = 0
@@ -138,7 +145,7 @@ def _map_sentences(processed_doc: str, unprocessed_sents: List[str]) -> Dict[str
     mapper = {}
 
     for paragraph in paragraphs:
-        for sentence in sent_tokenize(paragraph):
+        for sentence in tokenize_to_sentences(paragraph):
             mapper[sentence] = unprocessed_sents[read_count]
             read_count += 1
             if read_count == len(unprocessed_sents): break
@@ -155,7 +162,7 @@ def tf_idf(text_doc: str) -> Dict[str, float]:
     idf_matrix = {}
 
     for paragraph in paragraphs:
-        for sentence in sent_tokenize(paragraph):
+        for sentence in tokenize_to_sentences(paragraph):
             for token in word_tokenize(sentence):
                 if tf_matrix.get(token) is None: tf_matrix[token] = 1
                 else: tf_matrix[token] += 1
@@ -240,3 +247,6 @@ def _get_pos_tags(sentence: str) -> List[Tuple[str, str]]:
         tagged_sentence.append(tagged_token)
 
     return tagged_sentence
+
+def tokenize_to_sentences(text_doc: str) -> str:
+    return mgr.sentence_tokenizer.tokenize(text_doc)
