@@ -108,27 +108,33 @@ def _get_possible_paths(chunk_graph: Dict[str, List[str]], chunk_mapper: Dict[st
     global START_TOKEN
     global END_TOKEN
     possible_paths = {}
+    path_word_count = {}
     beam = [(chunk, str(path_number)) for path_number, chunk in enumerate(chunk_graph[START_TOKEN])]
     reverse_chunk_mapper = _reverse_chunk_map(chunk_mapper)
 
-    loop_count = 1
+    # loop_count = 1
     traversed_nodes = []
     logging.info('method: _get_possible_paths- Starting Beam Search . . . . ') 
     while len(beam) > 0:
-        if loop_count % 200 == 0: print('Multiple of 50 done')
-        if loop_count == 4000: 
-            with open('tr_nodes.txt', 'w') as file: file.write(str(traversed_nodes))
-            break
-        loop_count += 1
+        # if loop_count % 200 == 0: print('Multiple of 50 done')
+        # if loop_count == 4000: 
+        #     with open('tr_nodes.txt', 'w') as file: file.write(str(traversed_nodes))
+        #     break
+        # loop_count += 1
         END_TOKEN_CHILD = -1
         chunk, path_id = beam.pop(0)
         traversed_nodes.append(chunk)
-        if possible_paths.get(path_id) is None: possible_paths[path_id] = [chunk]
-        else: 
+        if possible_paths.get(path_id) is None:
+            # New path being created 
+            possible_paths[path_id] = [chunk]
+            path_word_count[path_id] = len(word_tokenize(chunk))
+        else:
             is_duplicate_available = _check_path_traversed(possible_paths[path_id], chunk)
-            if is_duplicate_available:
+            path_word_count[path_id] += len(word_tokenize(chunk))
+            if is_duplicate_available or path_word_count[path_id] > 25:
                 # Caught in a cyclic loop
                 del possible_paths[path_id]
+                del path_word_count[path_id]
                 continue
             possible_paths[path_id].append(chunk)
 
@@ -168,8 +174,10 @@ def _get_possible_paths(chunk_graph: Dict[str, List[str]], chunk_mapper: Dict[st
                     new_path_id = path_id + '-' + str(idx)
                     # Copying the previous path for the new diverged path
                     possible_paths[new_path_id] = copy(possible_paths[path_id])
+                    path_word_count[new_path_id] = path_word_count[path_id]
                     beam.append((chunk, new_path_id))
         del possible_paths[path_id]
+        del path_word_count[path_id]
         del reverse_sorted_chunks
 
     logging.info('method: _get_possible_paths- Beam Search over, extracted paths in the graph')

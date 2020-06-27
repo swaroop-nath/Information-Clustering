@@ -1,5 +1,6 @@
 import re
 from spacy.lang.en.stop_words import STOP_WORDS as stop_words_list
+import spacy
 import numpy as np
 from typing import Dict, List, Tuple
 from normalise import normalise
@@ -21,7 +22,7 @@ def simple_pre_process(text_doc: str) -> str:
     3. Non-English terms. For example - /mænˈdɛlə/ will be filtered out by the pre-processing.
     '''
 
-    non_printable_chars = filter(lambda char_: char_ not in mgr.allowed_printable_chars, text_doc)
+    non_printable_chars = filter(lambda char_: char_ not in mgr.allowed_printable_chars and char_ not in mgr.accepted_apostrophe_symbols, text_doc)
     non_printable_regex = []
 
     for char_ in non_printable_chars:
@@ -29,6 +30,11 @@ def simple_pre_process(text_doc: str) -> str:
     
     quotation_free_doc = re.sub(mgr.quotation_regex, '', text_doc)
     reference_free_doc = re.sub(mgr.reference_regex, '', quotation_free_doc)
+
+    matches = re.findall(mgr.acronym_period_regex, text_doc)
+    for match in matches:
+        replace_string = re.sub('\.', '', match)
+        reference_free_doc = re.sub(match, replace_string, reference_free_doc)
 
     final_doc = reference_free_doc
 
@@ -48,64 +54,38 @@ def rigorous_pre_process(text_doc: str, abbrevs: Dict[str, str], remove_stop_wor
     be used to output the un-processed sentence while outputting the summary. Along with that it also returns the 
     processed text document. This will be used for grouping paragraphs in the subsequent step.
     '''
-    
-    # Resolving coreference
-    resolved_doc = _resolve_pronouns(text_doc)
 
-    # Expanding contractions, like aren't to are not. And storing the unprocessed sentences.
-    paragraphs = resolved_doc.split(mgr.paragraph_separator)
-    unprocessed_sents = []
-    expanded_paragraphs = []
-    
+    paragraphs = text_doc.split(mgr.paragraph_separator)
+    sentence_mapper = {}
+    processed_paragraphs = []
+
     for paragraph in paragraphs:
-        expanded_paragraph = _expand_textual_contractions(paragraph)
-        for sentence in sent_tokenize(paragraph):
-            unprocessed_sents.append(sentence)
-        expanded_paragraphs.append(expanded_paragraph)
-    del paragraphs
-
-    # Removing unwanted abbreviations, those inside braces
-    cleaned_paragraphs = []
-    for paragraph in expanded_paragraphs:
-        cleaned_paragraph = _remove_unwanted_abbrev(paragraph, abbrevs)
-        cleaned_paragraphs.append(cleaned_paragraph)
-    del expanded_paragraphs
-
-    # Treating abbreviations, like U.S.A --> United States of America, and also context based abbreviations
-    normalised_paragraphs = []
-    for paragraph in cleaned_paragraphs:
-        normalised_paragraph = _normalize_paragraph(paragraph, abbrevs)
-        normalised_paragraphs.append(normalised_paragraph)
-    del cleaned_paragraphs
-
-    # Removing unwanted symbols.
-    cleaned_paragraphs = []
-    for paragraph in normalised_paragraphs:
-        cleaned_paragraph = re.sub(mgr.unnecessary_identifier_regex, '', paragraph)
-        cleaned_paragraphs.append(cleaned_paragraph)
-    del normalised_paragraphs
-
-    # Removing stop words and lower-casing the text
-    stop_word_free_paragraphs = []
-    for paragraph in cleaned_paragraphs:
-        stop_word_free_paragraph = _remove_stop_words_and_lower_case(paragraph, remove_stop_words)
-        stop_word_free_paragraphs.append(stop_word_free_paragraph)
-    del cleaned_paragraphs
-
-    # Lemmatize the text.
-    lemmatized_paragraphs = []
-    for paragraph in stop_word_free_paragraphs:
-        lemmatized_paragraph = _lemmatize_paragraph(paragraph)
-        lemmatized_paragraphs.append(lemmatized_paragraph)
-    processed_text = mgr.paragraph_separator.join(lemmatized_paragraphs)
-    del stop_word_free_paragraphs, lemmatized_paragraphs
-
-    # Doing post cleaning, removing double - spaces, spaces before period etc.
-    processed_text = _do_post_processing(processed_text)
-
-    # Mapping to unprocessed sentences.
-    sentence_mapper = _map_sentences(processed_text, unprocessed_sents)
+        sentences = sent_tokenize(paragraph)
+        processed_paragraph = []
+        for sentence in sentences:
+            sentence = str(sentence)
+            # Expanding textual contractions
+            expanded_sentence = _expand_textual_contractions(sentence)
+            # Removing unwanted abbreviations, those inside braces
+            cleaned_sentence = _remove_unwanted_abbrev(expanded_sentence, abbrevs)
+            # Treating abbreviations, like U.S.A --> United States of America, and also context based abbreviations
+            normalised_sentence = _normalize_sentence(cleaned_sentence, abbrevs)
+            # Removing unwanted symbols
+            cleaned_sentence = re.sub(mgr.unnecessary_identifier_regex, '', normalised_sentence)
+            # Removing stop words and lower-casing the text
+            stop_word_free_sentence = _remove_stop_words_and_lower_case(cleaned_sentence, remove_stop_words = False)
+            # Lemmatize the text
+            lemmatized_sentence = _lemmatize_sentence(stop_word_free_sentence)
+            # Doing post cleaning, removing double - spaces, spaces before period etc.
+            processed_sentence = _do_post_processing(lemmatized_sentence)
+            
+            sentence_mapper[processed_sentence] = sentence
+            processed_paragraph.append(processed_sentence)
+        
+        processed_paragraph = mgr.sentence_separator.join(processed_paragraph)
+        processed_paragraphs.append(processed_paragraph) 
     
+    processed_text = mgr.paragraph_separator.join(processed_paragraphs)
     return (sentence_mapper, processed_text)
 
 def _resolve_pronouns(text_doc: str) -> str:
@@ -121,53 +101,34 @@ def _remove_unwanted_abbrev(paragraph: str, abbrevs: Dict[str, str]) -> str:
     
     return paragraph
 
-def _expand_textual_contractions(paragraph: str) -> str:
-    expanded_sentences = []
-    for sentence in sent_tokenize(paragraph):
-        expanded_sentence = list(mgr.expander.expand_texts([sentence], precise=True))[0]
-        expanded_sentences.append(expanded_sentence)
-    
-    processed_paragraph = mgr.sentence_separator.join(expanded_sentences)
-    return processed_paragraph
+def _expand_textual_contractions(sentence: str) -> str:
+    expanded_sentence = list(mgr.expander.expand_texts([sentence], precise=True))[0]
+    return expanded_sentence
 
-def _normalize_paragraph(paragraph: str, user_abbrevs: str) -> str:
-    normalised_sentences = []
+def _normalize_sentence(sentence: str, user_abbrevs: str) -> str:
     user_abbrevs.update(mgr.abbreviations_map)
+    normalised_sentence = mgr.token_separator.join(normalise(word_tokenize(sentence), verbose=False, user_abbrevs=user_abbrevs))
+    return normalised_sentence
 
-    for sentence in sent_tokenize(paragraph):
-        normalised_sentence = mgr.token_separator.join(normalise(word_tokenize(sentence), verbose=False, user_abbrevs=user_abbrevs))
-        normalised_sentences.append(normalised_sentence)
+def _remove_stop_words_and_lower_case(sentence: str, remove_stop_words: bool) -> str:
+    if remove_stop_words: processed_words = [token.lower() for token in word_tokenize(sentence) if token not in stop_words_list]
+    else: processed_words = [token.lower() for token in word_tokenize(sentence)]
+    processed_sentence = mgr.token_separator.join(processed_words)
+    return processed_sentence
 
-    processed_paragraph = mgr.sentence_separator.join(normalised_sentences)
-    return processed_paragraph
+def _lemmatize_sentence(sentence: str) -> str:
+    spacy_doc = mgr.spacy_tool(sentence)
+    processed_tokens = []
+    for token in spacy_doc:
+        lemma = token.lemma_ if token.lemma_ != mgr.unnecessary_unresolved_pron else token.lower_ 
+        processed_tokens.append(lemma)
+    processed_sentence = mgr.token_separator.join(processed_tokens)
 
-def _remove_stop_words_and_lower_case(paragraph: str, remove_stop_words: bool) -> str:
-    processed_sentences = []
-    for sentence in sent_tokenize(paragraph):
-        if remove_stop_words: processed_words = [token.lower() for token in word_tokenize(sentence) if token not in stop_words_list]
-        else: processed_words = [token.lower() for token in word_tokenize(sentence)]
-        processed_sentence = mgr.token_separator.join(processed_words)
-        processed_sentences.append(processed_sentence)
-    
-    processed_paragraph = mgr.sentence_separator.join(processed_sentences)
-    return processed_paragraph
-
-def _lemmatize_paragraph(paragraph: str) -> str:
-    processed_sentences = []
-    for sentence in sent_tokenize(paragraph):
-        spacy_doc = mgr.spacy_tool(sentence)
-        processed_tokens = []
-        for token in spacy_doc:
-            processed_tokens.append(token.lemma_)
-        processed_sentences.append(mgr.token_separator.join(processed_tokens))
-
-    processed_paragraph = mgr.sentence_separator.join(processed_sentences)
-    return processed_paragraph
+    return processed_sentence
 
 def _do_post_processing(text_doc: str) -> str:
     doc = re.sub(mgr.unnecessary_space, ' ', text_doc)
     doc = re.sub(mgr.unnecessary_space_period, '.', doc)
-    doc = re.sub(mgr.unnecessary_unresolved_pron, '', doc)
     doc = re.sub(mgr.unnecessary_apostrophe, '', doc)
     return doc
 
