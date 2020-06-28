@@ -10,6 +10,7 @@ from nltk.tokenize import word_tokenize
 from abbreviations import schwartz_hearst
 from utils import load_sentence_vectorizer, load_text_chunker_model
 from copy import copy
+end = time()
 
 def simple_pre_process(text_doc: str) -> str:
     '''
@@ -42,11 +43,9 @@ def simple_pre_process(text_doc: str) -> str:
     for regex in non_printable_regex:
         final_doc = re.sub(regex, '', final_doc)
 
-    # final_doc = re.sub(mgr.unnecessary_space, ' ', final_doc)
-
     return final_doc
 
-def rigorous_pre_process(text_doc: str, abbrevs: Dict[str, str], remove_stop_words: bool = True) -> (Dict[str, str], str):
+def rigorous_pre_process(text_doc: str, abbrevs: Dict[str, str], remove_stop_words: bool = True, chunk_graph_call: bool = False) -> (Dict[str, str], List[List[str]]):
     '''
     This is meant to be an extensive pre-processing procedure. It does assume that simple preprocessing has been done on the
     text. It further extends the pre-processing to lower-casing the text, removal of apostrophes'/expansion of abbreviations,
@@ -69,29 +68,37 @@ def rigorous_pre_process(text_doc: str, abbrevs: Dict[str, str], remove_stop_wor
             apostrophe_free_sentence = copy(sentence)
             for apostrophe_symbol in mgr.accepted_apostrophe_symbols:
                 apostrophe_free_sentence = re.sub(apostrophe_symbol + 's', '', apostrophe_free_sentence)
+
             # Expanding textual contractions
             expanded_sentence = _expand_textual_contractions(apostrophe_free_sentence)
+
             # Removing unwanted abbreviations, those inside braces
             cleaned_sentence = _remove_unwanted_abbrev(expanded_sentence, abbrevs)
+
             # Treating abbreviations, like U.S.A --> United States of America, and also context based abbreviations
             normalised_sentence = _normalize_sentence(cleaned_sentence, abbrevs)
+
             # Removing unwanted symbols
-            cleaned_sentence = re.sub(mgr.unnecessary_identifier_regex, '', normalised_sentence)
+            if not chunk_graph_call: cleaned_sentence = re.sub(mgr.unnecessary_identifier_regex, '', normalised_sentence)
+            else: cleaned_sentence = normalised_sentence
+
             # Removing stop words and lower-casing the text
             stop_word_free_sentence = _remove_stop_words_and_lower_case(cleaned_sentence, remove_stop_words = False)
+
             # Lemmatize the text
             lemmatized_sentence = _lemmatize_sentence(stop_word_free_sentence)
+
             # Doing post cleaning, removing double - spaces, spaces before period etc.
-            processed_sentence = _do_post_processing(lemmatized_sentence)
+            processed_sentence = _do_post_processing(lemmatized_sentence, chunk_graph_call)
             
             sentence_mapper[processed_sentence] = sentence
             processed_paragraph.append(processed_sentence)
         
-        processed_paragraph = mgr.sentence_separator.join(processed_paragraph)
+        # processed_paragraph = mgr.sentence_separator.join(processed_paragraph)
         processed_paragraphs.append(processed_paragraph) 
     
-    processed_text = mgr.paragraph_separator.join(processed_paragraphs)
-    return (sentence_mapper, processed_text)
+    # processed_text = mgr.paragraph_separator.join(processed_paragraphs)
+    return (sentence_mapper, processed_paragraphs)
 
 def _resolve_pronouns(text_doc: str) -> str:
     spacy_doc = mgr.spacy_tool(text_doc)
@@ -131,11 +138,14 @@ def _lemmatize_sentence(sentence: str) -> str:
 
     return processed_sentence
 
-def _do_post_processing(text_doc: str) -> str:
+def _do_post_processing(text_doc: str, chunk_graph_call: bool) -> str:
     doc = re.sub(mgr.unnecessary_space, ' ', text_doc)
     doc = re.sub(mgr.unnecessary_space_period, '.', doc)
     doc = re.sub(mgr.unnecessary_apostrophe, '', doc)
     doc = re.sub(mgr.period_regex, '', doc)
+
+    if chunk_graph_call: return doc
+
     if not re.match(mgr.valid_eos_token, doc[-1]): return doc + '.'
     else: return doc
 
@@ -152,17 +162,16 @@ def _map_sentences(processed_doc: str, unprocessed_sents: List[str]) -> Dict[str
         if read_count == len(unprocessed_sents): break
     return mapper
 
-def tf_idf(text_doc: str) -> Dict[str, float]:
+def tf_idf(paragraphs: List[List[str]]) -> Dict[str, float]:
     '''
     This method is used to find out the tf_idf scores for each word in a document. Given a rigorously pre-processed
     document, this outputs a dictionary of words along with their tf-idf scores
     '''
-    paragraphs = text_doc.split(mgr.paragraph_separator)
     tf_matrix = {}
     idf_matrix = {}
 
     for paragraph in paragraphs:
-        for sentence in tokenize_to_sentences(paragraph):
+        for sentence in paragraph:
             for token in word_tokenize(sentence):
                 if tf_matrix.get(token) is None: tf_matrix[token] = 1
                 else: tf_matrix[token] += 1
@@ -174,7 +183,8 @@ def tf_idf(text_doc: str) -> Dict[str, float]:
     for token in tf_matrix.keys():
         count = 0
         for paragraph in paragraphs:
-            if token in paragraph: count += 1
+            str_paragraph = mgr.sentence_separator.join(paragraph)
+            if token in str_paragraph: count += 1
         idf_matrix[token] = np.log((len(paragraphs) / count) + 1)
     
     '''

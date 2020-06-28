@@ -14,6 +14,8 @@ def summarize_docs(docs: List[str]) -> str:
     This method is the abstraction that is provided to the end user for utilization. It outputs a summary
     for a given list of documents.
     '''
+    max_output_sentences = 80
+
     sentence_mapper = None
     important_paragraphs = []
     faulty_mapper = {}
@@ -27,12 +29,12 @@ def summarize_docs(docs: List[str]) -> str:
     start = time()
     logging.info('method: summarize_docs- Extracting top_k paragraphs from the document')
     for idx, doc in enumerate(docs):
-        mapper, top_k = extract_top_k_paragraphs(doc, abbrevs, k = 50)
+        mapper, top_k = extract_top_k_paragraphs(doc, abbrevs)
         if idx == 1:
             faulty_mapper = mapper
         if sentence_mapper is None: sentence_mapper = mapper
         else: sentence_mapper.update(mapper)
-        important_paragraphs.append(top_k)
+        important_paragraphs.extend(top_k)
     end = time()
     print('Time taken to extract top k paragraphs: {:03f} seconds'.format(end - start))
 
@@ -48,22 +50,13 @@ def summarize_docs(docs: List[str]) -> str:
     end = time()
     print('Time taken to cluster sentences: {:03f} seconds'.format(end - start))
 
-    # with open('clusters.dmp', 'wb') as file: pkl.dump(clusters, file)
-    # with open('noise.dmp', 'wb') as file: pkl.dump(noisy_data, file)
-    # with open('mapper.dmp', 'wb') as file: pkl.dump(final_sentence_mapper, file)
-
-    # with open('clusters.dmp', 'rb') as file: clusters = pkl.load(file)
-    # with open('noise.dmp', 'rb') as file: noisy_data = pkl.load(file)    
-    # with open('mapper.dmp', 'rb') as file: final_sentence_mapper = pkl.load(file)
-    # abbrevs = {'ANCYL': 'ANC Youth League', 'PAC': 'Pan Africanist Congress', 'ANC': 'African National Congress', 'TRC': 'Truth and Reconciliation Commission'}
-
     start = time()
     logging.info('method: summarize_docs- Extracting a good path for each of the found cluster')
     cluster_paths = []
     for cluster in clusters:
         possible_path = extract_possible_path(cluster, final_sentence_mapper, abbrevs)
         mapper, processed_path = rigorous_pre_process(possible_path, abbrevs)
-        cluster_paths.append(processed_path)
+        cluster_paths.append(processed_path[0][0])
         final_sentence_mapper.update(mapper)
     end = time()
     print('Time taken to extract a good path from cluster: {:03f} seconds'.format(end - start))
@@ -72,7 +65,7 @@ def summarize_docs(docs: List[str]) -> str:
     logging.info('method: summarize_docs- Ranking sentences for preparing final summary')
     ranked_sentences = rank_sentences(cluster_paths, noisy_data)
     fraction_output = 0.4
-    num_output_sentences = int(fraction_output * len(ranked_sentences))
+    num_output_sentences = min(int(fraction_output * len(ranked_sentences)), max_output_sentences)
     output = []
     num_added = 0
     for sentence in ranked_sentences:
@@ -84,13 +77,11 @@ def summarize_docs(docs: List[str]) -> str:
 
     return mgr.sentence_separator.join(output)
 
-def _process_output_imp_para(sentence_mapper: Dict[str, str], list_of_important_paragraphs: List[str]) -> (str, Dict[str, str]):
-    doc = mgr.paragraph_separator.join(list_of_important_paragraphs)
+def _process_output_imp_para(sentence_mapper: Dict[str, str], list_of_important_paragraphs: List[List[str]]) -> (List[List[str]], Dict[str, str]):
     final_mapper = {}
 
-    for imp_paragraphs in list_of_important_paragraphs:
-        for paragraph in imp_paragraphs.split('\n\n'):
-            for sentence in tokenize_to_sentences(paragraph):
-                final_mapper[sentence] = sentence_mapper[sentence]
+    for imp_paragraph in list_of_important_paragraphs:
+        for sentence in imp_paragraph:
+            final_mapper[sentence] = sentence_mapper[sentence]
 
-    return doc, final_mapper
+    return list_of_important_paragraphs, final_mapper

@@ -1,11 +1,11 @@
 from typing import List, Dict
 import manager as mgr
 from numpy import log, sqrt
-from nltk.tokenize import sent_tokenize, word_tokenize
+from nltk.tokenize import word_tokenize
 from text_utils import simple_pre_process, rigorous_pre_process, tf_idf
 import logging
 
-def extract_top_k_paragraphs(text_doc: str, abbrevs: Dict[str, str], k: int = 10) -> (Dict[str, str], str):
+def extract_top_k_paragraphs(text_doc: str, abbrevs: Dict[str, str], k: int = 10) -> (Dict[str, str], List[List[str]]):
     '''
     This method is used to extract the top k paragraphs in the document. It returns a tuple
     of a sentence mapper and the list of top k paragraphs.
@@ -14,22 +14,21 @@ def extract_top_k_paragraphs(text_doc: str, abbrevs: Dict[str, str], k: int = 10
     '''
     simple_processed_doc = simple_pre_process(text_doc=text_doc)
     sentence_mapper, rigorously_processed_doc = rigorous_pre_process(text_doc=simple_processed_doc, abbrevs=abbrevs)
-    tf_idf_values = tf_idf(text_doc=rigorously_processed_doc)
+    tf_idf_values = tf_idf(paragraphs=rigorously_processed_doc)
 
     # logging.info('method: extract_top_k_paragraphs- Starting the ranking of paragraphs')
     ranked_paragraphs = _rank_and_order_paragraphs(rigorously_processed_doc, tf_idf_values)
     # logging.info('method: extract_top_k_paragraphs- Ranked top {} paragraphs in the document'.format(k))
 
     num_returns = min(k, len(ranked_paragraphs))
-    return sentence_mapper, mgr.paragraph_separator.join(ranked_paragraphs[:num_returns])
+    return sentence_mapper, ranked_paragraphs[:num_returns]
 
-def _rank_and_order_paragraphs(processed_doc: str, tf_idf_values: Dict[str, float]) -> List[str]:
+def _rank_and_order_paragraphs(paragraphs: List[List[str]], tf_idf_values: Dict[str, float]) -> List[List[str]]:
     '''
     This method is used to rank a paragraph based on normalized tf-idf and length scores.
     It returns all the paragraphs in ascending order of their rank.
     '''
     paragraph_score = {} # idx: score type dictionary. idx specifies the index of paragraph in the document.
-    paragraphs = processed_doc.split(mgr.paragraph_separator)
 
     for idx, paragraph in enumerate(paragraphs):
         score = _find_paragraph_score(paragraph, tf_idf_values)
@@ -38,7 +37,7 @@ def _rank_and_order_paragraphs(processed_doc: str, tf_idf_values: Dict[str, floa
     ranked_paragraphs = [paragraphs[idx] for idx, _ in sorted(paragraph_score.items(), key=lambda item: item[1], reverse=True)]
     return ranked_paragraphs
 
-def _find_paragraph_score(paragraph: str, tf_idf_values: Dict[str, float]) -> float:
+def _find_paragraph_score(paragraph: List[str], tf_idf_values: Dict[str, float]) -> float:
     '''
     This method finds the score of a paragraph based on two parameters - normalized tf-idf
     and length score. The length score is determined by the sentences in the paragraph. The idea
@@ -52,16 +51,15 @@ def _find_paragraph_score(paragraph: str, tf_idf_values: Dict[str, float]) -> fl
     tf_idf_score = 0
     beta_0 = 0.9
     beta_1 = 0.1
-    sentences = sent_tokenize(paragraph)
 
-    for sentence in sentences:
+    for sentence in paragraph:
         word_tokens = word_tokenize(sentence)
         paragraph_length += len(word_tokens)
         for token in word_tokens:
             tf_idf_score += tf_idf_values[token]
 
     tf_idf_score = tf_idf_score / log(paragraph_length + 1)
-    length_score = sqrt(len(sentences))
+    length_score = sqrt(len(paragraph))
 
     return beta_0 * tf_idf_score + beta_1 * length_score
         

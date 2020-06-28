@@ -80,18 +80,17 @@ def _get_tf_idf_values(sentence_wise_chunks: List[str], abbrevs: Dict[str, str])
     
     for chunk in flattend_chunks:
         simple_processed_doc = simple_pre_process(text_doc=chunk)
-        mapper, rigorously_processed_doc = rigorous_pre_process(text_doc=simple_processed_doc, abbrevs=abbrevs, remove_stop_words=False)
+        mapper, rigorously_processed_doc = rigorous_pre_process(text_doc=simple_processed_doc, abbrevs=abbrevs, remove_stop_words=False, chunk_graph_call = True)
 
         for chunk, processed_chunk in mapper.items():
             if chunk_mapper.get(chunk) is None: chunk_mapper[chunk] = [processed_chunk]
             else: chunk_mapper[chunk].append(processed_chunk)
-        processed_docs.append(rigorously_processed_doc)
+        processed_docs.extend(rigorously_processed_doc)
     
     for chunk, processed_chunks in chunk_mapper.items():
         chunk_mapper[chunk] = list(set(processed_chunks))
 
-    text_doc = mgr.paragraph_separator.join(processed_docs)
-    tf_idf_values = tf_idf(text_doc=text_doc)
+    tf_idf_values = tf_idf(paragraphs=processed_docs)
 
     return chunk_mapper, tf_idf_values
 
@@ -116,11 +115,6 @@ def _get_possible_paths(chunk_graph: Dict[str, List[str]], chunk_mapper: Dict[st
     traversed_nodes = []
     logging.info('method: _get_possible_paths- Starting Beam Search . . . . ') 
     while len(beam) > 0:
-        # if loop_count % 200 == 0: print('Multiple of 50 done')
-        # if loop_count == 4000: 
-        #     with open('tr_nodes.txt', 'w') as file: file.write(str(traversed_nodes))
-        #     break
-        # loop_count += 1
         END_TOKEN_CHILD = -1
         chunk, path_id = beam.pop(0)
         traversed_nodes.append(chunk)
@@ -176,11 +170,8 @@ def _get_possible_paths(chunk_graph: Dict[str, List[str]], chunk_mapper: Dict[st
                     possible_paths[new_path_id] = copy(possible_paths[path_id])
                     path_word_count[new_path_id] = path_word_count[path_id]
                     beam.append((chunk, new_path_id))
-        del possible_paths[path_id]
-        del path_word_count[path_id]
-        del reverse_sorted_chunks
 
-    logging.info('method: _get_possible_paths- Beam Search over, extracted paths in the graph')
+    logging.info('method: _get_possible_paths- Beam Search over, extracted {} paths in the graph'.format(len(possible_paths)))
 
     final_paths = []
     detokenizer = TreebankWordDetokenizer()

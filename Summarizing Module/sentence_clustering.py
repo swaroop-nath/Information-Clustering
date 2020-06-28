@@ -1,16 +1,15 @@
 from typing import List, Dict
 import numpy as np
-from nltk import sent_tokenize
 from text_utils import vectorize_sentence
 from utils import find_clusters_and_noise
 import logging
 
-def extract_clusters(text_doc: str) -> List[List[str]]:
+def extract_clusters(paragraphs: List[List[str]]) -> (List[List[str]], List[str]):
     '''
     This method takes in a text document and finds the clusters of sentences. It returns the set of clusters
     found.
     '''
-    sentences = sent_tokenize(text_doc)
+    sentences = [sentence for paragraph in paragraphs for sentence in paragraph]
     logging.info('method: extract_clusters- Vectorizing sentences')
     vector_lookup_table, sentence_lookup_table = _vectorize_sentences(sentences)
 

@@ -7,7 +7,6 @@ from lexrank import LexRank
 def rank_sentences(cluster_paths: List[str], noise_sentences: List[str]) -> List[str]:
     final_sentences = cluster_paths.copy()
     final_sentences.extend(noise_sentences)
-    del cluster_paths, noise_sentences
 
     ranker = LexRank(final_sentences)
     sentence_scores = ranker.rank_sentences(final_sentences)
