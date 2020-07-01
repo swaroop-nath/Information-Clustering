@@ -3,7 +3,6 @@ import manager as mgr
 from numpy import log, sqrt
 from nltk.tokenize import word_tokenize
 from text_utils import simple_pre_process, rigorous_pre_process, tf_idf
-import logging
 
 def extract_top_k_paragraphs(text_doc: str, abbrevs: Dict[str, str], k: int = 10) -> (Dict[str, str], List[List[str]]):
     '''
@@ -16,9 +15,9 @@ def extract_top_k_paragraphs(text_doc: str, abbrevs: Dict[str, str], k: int = 10
     sentence_mapper, rigorously_processed_doc = rigorous_pre_process(text_doc=simple_processed_doc, abbrevs=abbrevs)
     tf_idf_values = tf_idf(paragraphs=rigorously_processed_doc)
 
-    # logging.info('method: extract_top_k_paragraphs- Starting the ranking of paragraphs')
+    mgr.logging.info('method: extract_top_k_paragraphs- Starting the ranking of paragraphs')
     ranked_paragraphs = _rank_and_order_paragraphs(rigorously_processed_doc, tf_idf_values)
-    # logging.info('method: extract_top_k_paragraphs- Ranked top {} paragraphs in the document'.format(k))
+    mgr.logging.info('method: extract_top_k_paragraphs- Ranked top {} paragraphs in the document'.format(k))
 
     num_returns = min(k, len(ranked_paragraphs))
     return sentence_mapper, ranked_paragraphs[:num_returns]
@@ -57,7 +56,7 @@ def _find_paragraph_score(paragraph: List[str], tf_idf_values: Dict[str, float])
         paragraph_length += len(word_tokens)
         for token in word_tokens:
             tf_idf_score += tf_idf_values[token]
-
+        
     tf_idf_score = tf_idf_score / log(paragraph_length + 1)
     length_score = sqrt(len(paragraph))
 

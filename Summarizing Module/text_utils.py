@@ -1,16 +1,14 @@
 import re
 from spacy.lang.en.stop_words import STOP_WORDS as stop_words_list
-import spacy
 import numpy as np
 from typing import Dict, List, Tuple
-from normalise import normalise
-import manager as mgr
+from normalise import normalise # Takes time to import and causes warning signals
+import manager as mgr # Takes appreciable time
 from nltk.tree import Tree
 from nltk.tokenize import word_tokenize
 from abbreviations import schwartz_hearst
-from utils import load_sentence_vectorizer, load_text_chunker_model
+from utils import load_sentence_vectorizer, load_text_chunker_model # Takes time
 from copy import copy
-end = time()
 
 def simple_pre_process(text_doc: str) -> str:
     '''
@@ -37,6 +35,9 @@ def simple_pre_process(text_doc: str) -> str:
         replace_string = re.sub('\.', '', match)
         match = re.sub('\.', '\\.', match)
         reference_free_doc = re.sub(match, replace_string, reference_free_doc)
+
+    for symbol in mgr.ellipse_symbols:
+        reference_free_doc = reference_free_doc.replace(symbol,'-')
 
     final_doc = reference_free_doc
 
@@ -89,7 +90,9 @@ def rigorous_pre_process(text_doc: str, abbrevs: Dict[str, str], remove_stop_wor
             lemmatized_sentence = _lemmatize_sentence(stop_word_free_sentence)
 
             # Doing post cleaning, removing double - spaces, spaces before period etc.
-            processed_sentence = _do_post_processing(lemmatized_sentence, chunk_graph_call)
+            try: processed_sentence = _do_post_processing(lemmatized_sentence, chunk_graph_call)
+            except:
+                print('Hi')
             
             sentence_mapper[processed_sentence] = sentence
             processed_paragraph.append(processed_sentence)

@@ -6,6 +6,7 @@ from nltk.tokenize import word_tokenize
 from nltk.tokenize.treebank import TreebankWordDetokenizer
 import logging
 from copy import copy
+from tqdm import tqdm
 
 START_TOKEN = '<<START>>'
 END_TOKEN = '<<END>>'
@@ -25,14 +26,17 @@ def extract_possible_path(processed_cluster: List[str], mapper: Dict[str, str], 
     for sentence in processed_cluster:
         cluster.append(mapper[sentence])
 
-    logging.info('method: extract_possible_path- Constructing Chunk Graph')
+    mgr.logging.info('method: extract_possible_path- Constructing Chunk Graph')
+    print('method: extract_possible_path- Constructing Chunk Graph')
     chunk_graph, chunk_mapper, word_tf_idf = _construct_chunk_graph(cluster, abbrevs)
-    logging.info('method: extract_possible_path- Getting the possible paths in the Chunk Graph')
+    mgr.logging.info('method: extract_possible_path- Getting the possible paths in the Chunk Graph')
+    print('method: extract_possible_path- Getting the possible paths in the Chunk Graph')
     possible_paths = _get_possible_paths(chunk_graph, chunk_mapper, word_tf_idf)
     del chunk_graph
     del chunk_mapper
     del word_tf_idf
-    logging.info('method: extract_possible_path- Scoring each path based on a language model')
+    mgr.logging.info('method: extract_possible_path- Scoring each path based on a language model')
+    print('method: extract_possible_path- Scoring each path based on a language model')
     filtered_path = _get_most_plausible_path(possible_paths)
     
     return filtered_path
@@ -45,9 +49,11 @@ def _check_for_similarity(cluster: List[str]) -> str:
     return True
 
 def _construct_chunk_graph(cluster: List[str], abbrevs: Dict[str, str]) -> (Dict[str, List[str]], Dict[str, List[str]], Dict[str, float]):
-    logging.info('method: _construct_chunk_graph- Extracting chunks for every sentence in the cluster')
+    mgr.logging.info('method: _construct_chunk_graph- Extracting chunks for every sentence in the cluster')
+    print('method: _construct_chunk_graph- Extracting chunks for every sentence in the cluster')
     sentence_wise_chunks = _chunk_sentences(cluster)
-    logging.info('method: _construct_chunk_graph- Extracting tf-idf values for heuristic scoring')
+    mgr.logging.info('method: _construct_chunk_graph- Extracting tf-idf values for heuristic scoring')
+    print('method: _construct_chunk_graph- Extracting tf-idf values for heuristic scoring')
     chunk_mapper, word_tf_idf = _get_tf_idf_values(sentence_wise_chunks, abbrevs)
     global START_TOKEN
     global END_TOKEN
@@ -55,7 +61,8 @@ def _construct_chunk_graph(cluster: List[str], abbrevs: Dict[str, str]) -> (Dict
     END_TOKEN = '<<END>>'
     chunk_graph = {START_TOKEN: []}
 
-    logging.info('method: _construct_chunk_graph- Chunk Graph Construction Start . . . . ')
+    mgr.logging.info('method: _construct_chunk_graph- Chunk Graph Construction Start . . . . ')
+    print('method: _construct_chunk_graph- Chunk Graph Construction Start . . . . ')
     for chunked_sentence in sentence_wise_chunks:
         chunk_graph[START_TOKEN].append(chunked_sentence[0])
         for chunk_idx in range(len(chunked_sentence) - 1):
@@ -69,7 +76,8 @@ def _construct_chunk_graph(cluster: List[str], abbrevs: Dict[str, str]) -> (Dict
     
     for start_node, children_nodes in chunk_graph.items():
         chunk_graph[start_node] = list(set(children_nodes))
-    logging.info('method: _construct_chunk_graph- Chunk Graph Construction done')
+    mgr.logging.info('method: _construct_chunk_graph- Chunk Graph Construction done')
+    print('method: _construct_chunk_graph- Chunk Graph Construction done')
 
     return chunk_graph, chunk_mapper, word_tf_idf
 
@@ -113,7 +121,8 @@ def _get_possible_paths(chunk_graph: Dict[str, List[str]], chunk_mapper: Dict[st
 
     # loop_count = 1
     traversed_nodes = []
-    logging.info('method: _get_possible_paths- Starting Beam Search . . . . ') 
+    mgr.logging.info('method: _get_possible_paths- Starting Beam Search . . . . ')
+    print('method: _get_possible_paths- Starting Beam Search . . . . ')
     while len(beam) > 0:
         END_TOKEN_CHILD = -1
         chunk, path_id = beam.pop(0)
@@ -171,15 +180,16 @@ def _get_possible_paths(chunk_graph: Dict[str, List[str]], chunk_mapper: Dict[st
                     path_word_count[new_path_id] = path_word_count[path_id]
                     beam.append((chunk, new_path_id))
 
-    logging.info('method: _get_possible_paths- Beam Search over, extracted {} paths in the graph'.format(len(possible_paths)))
-
     final_paths = []
     detokenizer = TreebankWordDetokenizer()
     for path in possible_paths.values():
         string_path = detokenizer.detokenize(path)
         if len(word_tokenize(string_path)) >= 8:
             final_paths.append(string_path)
-    
+
+    mgr.logging.info('method: _get_possible_paths- Beam Search over, extracted {} paths in the graph'.format(len(final_paths)))
+    print('method: _get_possible_paths- Beam Search over, extracted {} paths in the graph'.format(len(final_paths)))
+
     return final_paths
 
 def _reverse_chunk_map(chunk_map: Dict[str, List[str]]) -> Dict[str, str]:
@@ -223,7 +233,7 @@ def _check_path_traversed(path: List[str], new_chunk: str) -> bool:
 def _get_most_plausible_path(paths: List[str]) -> str:
     max_score = -float('inf')
     max_score_sentence = ''
-    for sentence in paths:
+    for sentence in tqdm(paths):
         plausibility_score = compute_sentence_plausibility(sentence)
         if plausibility_score > max_score:
             max_score = plausibility_score

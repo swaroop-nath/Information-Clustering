@@ -2,7 +2,7 @@ from typing import List, Dict
 import numpy as np
 from text_utils import vectorize_sentence
 from utils import find_clusters_and_noise
-import logging
+import manager as mgr
 
 def extract_clusters(paragraphs: List[List[str]]) -> (List[List[str]], List[str]):
     '''
@@ -10,11 +10,16 @@ def extract_clusters(paragraphs: List[List[str]]) -> (List[List[str]], List[str]
     found.
     '''
     sentences = [sentence for paragraph in paragraphs for sentence in paragraph]
-    logging.info('method: extract_clusters- Vectorizing sentences')
+    mgr.logging.info('method: extract_clusters- Vectorizing sentences')
+    print('method: extract_clusters- Vectorizing sentences')
     vector_lookup_table, sentence_lookup_table = _vectorize_sentences(sentences)
 
-    logging.info('method: extract_clusters- Find clusters in the document')
+    mgr.logging.info('method: extract_clusters- Find clusters in the document')
+    print('method: extract_clusters- Find clusters in the document')
     clusters, noisy_data = find_clusters_and_noise(vector_lookup_table)
+
+    mgr.logging.info('method: extract_clusters- Found {} cluster(s) in the document'.format(len(clusters)))
+    print('method: extract_clusters- Found {} cluster(s) in the document'.format(len(clusters)))
 
     processed_clusters = []
     processed_noise = []

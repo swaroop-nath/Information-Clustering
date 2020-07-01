@@ -5,7 +5,6 @@ from typing import Dict, List
 import numpy as np
 from sklearn.neighbors import KernelDensity
 import matplotlib.pyplot as plt
-import logging
 from chunker import NGramTagChunker
 from pickle import load
 
